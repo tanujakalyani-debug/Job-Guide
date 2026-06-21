@@ -11,6 +11,7 @@ test.only('First Playwright TestCase',async ({browser})=> {
     await page.getByPlaceholder("Location").fill("Remote")
     await page.keyboard.press("Enter")
     await console.log("LinkedIn")
+    await console.log(page.getByRole('ul',{'class' : 'jobs-search__results-list'}))
     await page.pause
 });
 
