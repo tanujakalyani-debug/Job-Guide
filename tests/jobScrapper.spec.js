@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
+import { text } from 'stream/consumers';
 
 test('scrape LinkedIn jobs', async ({ page }) => {
   // 1. Navigate to LinkedIn Jobs
@@ -21,12 +22,12 @@ test('scrape LinkedIn jobs', async ({ page }) => {
   
   // 3. Search for jobs
   await console.log(await page.title());
-  const Button_Modal = page.locator("//button[@aria-label='Dismiss' and @data-tracking-control-name='public_jobs_apply-link-offsite_contextual-sign-in-modal_modal_dismiss']");
-  const Section_Modal = page.getByRole("dialog");
-  await Button_Modal.highlight();
-  //await Section_Modal.waitFor({state:"visible"});
+  const Button_Modal = page.locator("(//button[@aria-label='Dismiss'])[1]");
+  const Section_Modal = page.getByRole("dialog").nth(0);
+  // await Button_Modal.highlight();
+  await Section_Modal.waitFor({state:"visible"});
   await Button_Modal.click({force: true});
-  //await Section_Modal.waitFor({state:"hidden"});
+  // await Section_Modal.waitFor({state:"hidden"});
   const searchQuery = 'Software Engineer';
   const location = 'Remote';
   
@@ -40,36 +41,52 @@ test('scrape LinkedIn jobs', async ({ page }) => {
   await page.keyboard.press("Enter")
   await console.log("LinkedIn")
     // await console.log(page.getByRole('ul',{'class' : 'jobs-search__results-list'}))
-  await page.waitForSelector('.jobs-search__results-list')
-  
+  await page.waitForSelector('.two-pane-serp-page__results-list')
+  const Jobs_List = await page.locator(".two-pane-serp-page__results-list")
   // 4. Extract job listings
   const jobs = [];
   let pageNum = 1;
-  const maxPages = 5; 
-  // Scrape first 5 pages
+  const maxPages = 2; 
+  // Scrape first 2 pages
   
   while (pageNum <= maxPages) {
     console.log(`Scraping page ${pageNum}...`);
     
     // Get all job cards on current page
-    const jobCards = await page.$$('.job-card-container');
-    console.log(jobCards)
-    
-    for (const card of jobCards) {
-      try {
-        // Click on job card to load details
-        await card.click();
-        await page.waitForTimeout(1000); // Wait for details to load
-        
-        // Extract job data
-        const jobData = await extractJobDetails(page);
-        jobs.push(jobData);
-        
-        console.log(`Extracted: ${jobData.title} at ${jobData.company}`);
-      } catch (error) {
-        console.error('Error extracting job:', error.message);
-      }
+    const List = await page.locator('ul.jobs-search__results-list li')
+    await List.first().waitFor({state:'visible'})
+    console.log(await List.first().locator('div >div>h3').innerText())
+    const jobCards = await List.count()
+    console.log("Number of Jobs : "+jobCards)
+  
+  const cards=[];
+  for (let i = 0; i < 5; i++) {
+    cards[i] = List.nth(i);
+    // Example: get job title
+    const title = await cards[i].locator('h3').innerText();
+    console.log(cards[i])
+    console.log(`Job ${i + 1}: ${title}`);
+  }
+  console.log(cards);
+  await cards[0].click();
+  for (const card of cards) {
+    console.log(card);
+    try {
+      // Click on job card to load details
+      console.log("Before click:", page.isClosed());
+      await card.click();
+      console.log("After click:", page.isClosed());
+      // await page.waitForTimeout(1000); // Wait for details to load
+      
+      // Extract job data
+      const jobData = await extractJobDetails(page);
+      jobs.push(jobData);
+      
+      console.log(`Extracted: ${jobData.title} at ${jobData.company}`);
+    } catch (error) {
+      console.error('Error extracting job:', error.message);
     }
+  }
     
     // Navigate to next page
     const nextButton = await page.$('button[aria-label="View next page"]');
@@ -97,8 +114,9 @@ test('scrape LinkedIn jobs', async ({ page }) => {
 
 // Helper function to extract job details
 async function extractJobDetails(page) {
+  console.log("Lets explore each Job in detail")
   // Wait for job details panel to load
-  await page.waitForSelector('.job-details');
+  await page.locator("[aria-label='Show more']").click();
   
   // Extract all fields
   const title = await page.$eval(
